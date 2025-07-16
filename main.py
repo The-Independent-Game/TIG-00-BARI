@@ -2,6 +2,29 @@
 from machine import Pin, I2C
 from ssd1306 import SSD1306_I2C
 import time
+import machine
+
+def play_tone(frequency, duration):
+    """Suona una nota per la durata specificata"""
+    buzzer.freq(frequency)
+    buzzer.duty_u16(32768)  # 50% duty cycle
+    time.sleep(duration)
+    buzzer.duty_u16(0)  # Silenzio
+
+buzzer = machine.PWM(machine.Pin(9))
+button_blue = Pin(4, Pin.IN, Pin.PULL_UP)
+internal_led = Pin(25, Pin.OUT)
+led_blue = Pin(11, Pin.OUT)
+
+button_blue_pressed = False
+
+def button_blue_handler(pin):
+    """Funzione chiamata quando il pulsante viene premuto"""
+    global button_blue_pressed
+    button_blue_pressed = True
+
+# Configura interrupt sul fronte di discesa (quando il pulsante viene premuto)
+button_blue.irq(trigger=Pin.IRQ_FALLING, handler=button_blue_handler)
 
 # Configurazione I2C
 i2c = I2C(0, scl=Pin(1), sda=Pin(0), freq=400000)  # I2C0, pins GP0 (SDA) e GP1 (SCL)
@@ -21,72 +44,22 @@ def clear_display():
 # Esempi di visualizzazione
 
 # 1. Testo semplice
-def show_text():
+def show_text(message):
     clear_display()
-    display.text("Ciao Mondo!", 0, 0, 1)  # 1 = bianco (pixel acceso)
-    display.text("Display SSD1306", 0, 16, 1)
-    display.text("con Pico W", 0, 32, 1)
+    display.text(message, 0, 0, 1)  # 1 = bianco (pixel acceso)
     display.show()
 
-# 2. Rettangolo
-def show_rectangle():
-    clear_display()
-    display.rect(10, 10, 108, 44, 1)  # x, y, larghezza, altezza, colore
-    display.text("Rettangolo", 30, 25, 1)
-    display.show()
 
-# 3. Rettangolo pieno
-def show_filled_rectangle():
-    clear_display()
-    display.fill_rect(20, 15, 88, 34, 1)  # x, y, larghezza, altezza, colore
-    display.text("Pieno", 50, 25, 0)  # 0 = nero (testo invertito)
-    display.show()
-
-# 4. Linee
-def show_lines():
-    clear_display()
-    for i in range(0, 128, 8):
-        display.line(0, 0, i, 63, 1)
-    for i in range(0, 64, 8):
-        display.line(0, 0, 127, i, 1)
-    display.show()
-
-# 5. Contatore semplice
-def counter_demo(count=10):
-    for i in range(count):
+while True:
+    if button_blue_pressed:
+        led_blue.on()
+        show_text("blue")
+        play_tone(1000, 0.5)
+        button_blue_pressed = False
+        time.sleep(0.5)
         clear_display()
-        display.text("Contatore:", 0, 0, 1)
-        display.text(str(i), 64, 32, 1)
-        display.show()
-        time.sleep(1)
-
-# Esecuzione degli esempi
-try:
-    # Verifico se il display è stato rilevato
-    if len(i2c.scan()) > 0:
-        print("Display rilevato!")
+        led_blue.off()
         
-        # Eseguo gli esempi
-        show_text()
-        time.sleep(2)
-        
-        show_rectangle()
-        time.sleep(2)
-        
-        show_filled_rectangle()
-        time.sleep(2)
-        
-        show_lines()
-        time.sleep(2)
-        
-        counter_demo(5)  # Conta fino a 5
-        
-        # Messaggio finale
-        clear_display()
-        display.text("Fine Demo", 25, 25, 1)
-        display.show()
-    else:
-        print("Nessun dispositivo I2C rilevato!")
-
-except Exception as e:
-    print("Errore:", e)
+    
+    time.sleep(0.1)
+1
