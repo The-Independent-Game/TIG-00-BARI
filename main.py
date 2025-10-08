@@ -4,13 +4,6 @@ import time
 import machine
 import random
 
-def play_tone(frequency, duration):
-    """Suona una nota per la durata specificata"""
-    buzzer.freq(frequency)
-    buzzer.duty_u16(32768)  # 50% duty cycle
-    time.sleep(duration)
-    buzzer.duty_u16(0)  # Silenzio
-
 buzzer = machine.PWM(machine.Pin(9))
 button_blue = Pin(4, Pin.IN, Pin.PULL_UP)
 button_yellow = Pin(5, Pin.IN, Pin.PULL_UP)
@@ -39,6 +32,13 @@ print("Dispositivi I2C connessi:", [hex(addr) for addr in i2c.scan()])
 
 # Inizializzazione del display (128x64 pixel)
 display = SSD1306_I2C(128, 64, i2c)
+
+def play_tone(frequency, duration):
+    """Suona una nota per la durata specificata"""
+    buzzer.freq(frequency)
+    buzzer.duty_u16(32768)  # 50% duty cycle
+    time.sleep(duration)
+    buzzer.duty_u16(0)  # Silenzio
 
 # Funzione per cancellare il display
 def clear_display():
@@ -77,6 +77,23 @@ def show_sequence(sequence, level):
 
     for color_id in sequence:
         flash_color(color_id, duration)
+
+def wait_for_start():
+    """Attende silenziosamente che un pulsante venga premuto per iniziare"""
+    # Aspetta che tutti i pulsanti siano rilasciati
+    while not all(COLORS[i][1].value() for i in range(4)):
+        time.sleep(0.01)
+
+    # Aspetta che un pulsante venga premuto (senza feedback)
+    while True:
+        for color_id in range(4):
+            _, button, _, _ = COLORS[color_id]
+            if button.value() == 0:  # Pulsante premuto (PULL_UP)
+                # Aspetta rilascio
+                while button.value() == 0:
+                    time.sleep(0.01)
+                return
+        time.sleep(0.01)
 
 def wait_for_button():
     """Attende che un pulsante venga premuto e rilasciato"""
@@ -131,20 +148,11 @@ def game_over(level):
     time.sleep(3)
 
 def game_win():
-    """Animazione vittoria"""
-    # Accende tutti i LED
-    for color_id in range(4):
-        COLORS[color_id][0].on()
-
-    # Suono vittoria
-    for freq in [400, 500, 600, 800]:
-        play_tone(freq, 0.2)
-
-    # Spegne tutti i LED
-    for color_id in range(4):
-        COLORS[color_id][0].off()
-
-    time.sleep(0.3)
+    """Messaggio vittoria"""
+    clear_display()
+    display.text("CORRECT", 35, 28, 1)
+    display.show()
+    time.sleep(1)
 
 # Game loop
 while True:
@@ -155,8 +163,8 @@ while True:
     display.text("to start", 30, 45, 1)
     display.show()
 
-    # Aspetta un pulsante qualsiasi
-    wait_for_button()
+    # Aspetta un pulsante qualsiasi (senza feedback)
+    wait_for_start()
 
     # Inizia il gioco
     sequence = []
