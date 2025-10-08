@@ -98,14 +98,27 @@ def wait_for_start():
                 return
         time.sleep(0.01)
 
-def wait_for_button():
-    """Attende che un pulsante venga premuto e rilasciato"""
+def wait_for_button(timeout=None):
+    """Attende che un pulsante venga premuto e rilasciato
+
+    Args:
+        timeout: Tempo massimo di attesa in secondi. None = nessun timeout
+
+    Returns:
+        color_id se premuto, None se timeout scaduto
+    """
     # Aspetta che tutti i pulsanti siano rilasciati
     while not all(COLORS[i][1].value() for i in range(4)):
         time.sleep(0.01)
 
+    start_time = time.time() if timeout else None
+
     # Aspetta che un pulsante venga premuto
     while True:
+        # Controlla timeout
+        if timeout and (time.time() - start_time) > timeout:
+            return None
+
         for color_id in range(4):
             led, button, text, tone = COLORS[color_id]
             if button.value() == 0:  # Pulsante premuto (PULL_UP)
@@ -124,16 +137,29 @@ def wait_for_button():
         time.sleep(0.01)
 
 def check_player_input(sequence):
-    """Verifica l'input del giocatore"""
+    """Verifica l'input del giocatore con timeout di 2 secondi per iniziare
+
+    Returns:
+        True se corretto, False se sbagliato, "timeout" se timeout
+    """
     clear_display()
     display.text("YOUR TURN!", 25, 28, 1)
     display.show()
     time.sleep(1)
 
     for i, expected_color in enumerate(sequence):
-        player_color = wait_for_button()
+        # Timeout di 2 secondi solo per il primo pulsante
+        timeout = 2.0 if i == 0 else None
+        player_color = wait_for_button(timeout)
+
+        # Timeout scaduto
+        if player_color is None:
+            return "timeout"
+
+        # Colore sbagliato
         if player_color != expected_color:
             return False
+
     return True
 
 def game_over(level):
@@ -188,7 +214,18 @@ while True:
         show_sequence(sequence, level)
 
         # Verifica input del giocatore
-        if not check_player_input(sequence):
+        result = check_player_input(sequence)
+
+        if result == "timeout":
+            # Mostra messaggio timeout
+            clear_display()
+            display.text("TIMEOUT", 35, 28, 1)
+            display.show()
+            time.sleep(1.5)
+            game_over(level)
+            break
+        elif not result:
+            # Errore normale
             game_over(level)
             break
 
