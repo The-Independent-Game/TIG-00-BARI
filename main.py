@@ -56,24 +56,27 @@ def show_text(message):
 
 def flash_color(color_id, duration=0.5):
     """Accende LED, suona tono e mostra testo per un colore"""
-    led, button, text, tone = COLORS[color_id]
+    led, _, text, tone = COLORS[color_id]
     led.on()
     show_text(text)
     play_tone(tone, duration)
     time.sleep(duration)
     led.off()
     clear_display()
-    time.sleep(0.2)
+    time.sleep(0.1)
 
-def show_sequence(sequence):
-    """Mostra la sequenza di colori"""
+def show_sequence(sequence, level):
+    """Mostra la sequenza di colori con velocità crescente per livello"""
     clear_display()
     display.text("WATCH!", 35, 28, 1)
     display.show()
     time.sleep(1)
 
+    # Velocità aumenta con il livello: da 0.6s a 0.2s minimo
+    duration = max(0.2, 0.6 - (level * 0.05))
+
     for color_id in sequence:
-        flash_color(color_id)
+        flash_color(color_id, duration)
 
 def wait_for_button():
     """Attende che un pulsante venga premuto e rilasciato"""
@@ -170,8 +173,8 @@ while True:
         display.show()
         time.sleep(1.5)
 
-        # Mostra la sequenza
-        show_sequence(sequence)
+        # Mostra la sequenza con velocità crescente
+        show_sequence(sequence, level)
 
         # Verifica input del giocatore
         if not check_player_input(sequence):
