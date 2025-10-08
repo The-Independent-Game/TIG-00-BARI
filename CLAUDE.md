@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a MicroPython project for Raspberry Pi Pico implementing a Simon Says game with hardware components:
+This is a MicroPython project for Raspberry Pi Pico2W implementing a Simon Says game with hardware components:
 - 4 colored buttons (blue, yellow, green, red) on GPIO pins 4-7
 - 4 corresponding LEDs on GPIO pins 11, 10, 2, 3
 - Buzzer on GPIO pin 9 (PWM)
