@@ -47,10 +47,13 @@ def clear_display():
 
 # Esempi di visualizzazione
 
-# 1. Testo semplice
+# 1. Testo semplice centrato
 def show_text(message):
     clear_display()
-    display.text(message, 0, 0, 1)  # 1 = bianco (pixel acceso)
+    # Centra il testo (ogni carattere è 8 pixel di larghezza)
+    x = (128 - len(message) * 8) // 2
+    y = 28  # Centrato verticalmente
+    display.text(message, x, y, 1)  # 1 = bianco (pixel acceso)
     display.show()
 
 
