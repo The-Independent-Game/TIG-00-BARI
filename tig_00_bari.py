@@ -176,7 +176,8 @@ class TIG00:
                 time.sleep_ms(duration_ms)
                 self.no_tone()
         else:
-            time.sleep_ms(duration_ms)
+            if duration_ms:
+                time.sleep_ms(duration_ms)
 
     def no_tone(self):
         """Ferma il tono del buzzer"""
@@ -186,14 +187,14 @@ class TIG00:
 
     def led_on(self, led_index, execute_sound):
         """Accende un LED specifico"""
-        try:
-            button = self.buttons[led_index]
-            button.led.on()
-            if execute_sound:
-                self.tone(button.tone)
-            self.playing_start()
-        except Exception as e:
-            print(f"LED error: {e}")
+        #try:
+        button = self.buttons[led_index]
+        button.led.on()
+        if execute_sound:
+            self.tone(button.tone)
+        self.playing_start()
+        #except Exception as e:
+        #    print(f"LED error: {e}")
 
     def all_leds_on(self):
         """Accende tutti i LED"""
@@ -531,45 +532,40 @@ class TIG00:
         self.change_game_state(self.GameStates.LOBBY)
 
         while True:
-            try:
-                # Leggi i pulsanti
-                self.read_buttons()
+            #try:
+            # Leggi i pulsanti
+            self.read_buttons()
 
-                # Menu opzioni (tutti i pulsanti premuti)
-                if self.are_all_buttons_pressed() and self.game_state != self.GameStates.OPTIONS:
-                    self.reset_button_states()
-                    self.change_game_state(self.GameStates.OPTIONS)
+            # Menu opzioni (tutti i pulsanti premuti)
+            if self.are_all_buttons_pressed() and self.game_state != self.GameStates.OPTIONS:
+                self.reset_button_states()
+                self.change_game_state(self.GameStates.OPTIONS)
 
-                # State machine
-                if self.game_state == self.GameStates.LOBBY:
-                    self.handle_lobby()
-                elif self.game_state == self.GameStates.SEQUENCE_CREATE_UPDATE:
-                    self.handle_sequence_create_update()
-                elif self.game_state == self.GameStates.SEQUENCE_PRESENTING:
-                    self.handle_sequence_presenting()
-                elif self.game_state == self.GameStates.PLAYER_WAITING:
-                    self.handle_player_waiting()
-                elif self.game_state == self.GameStates.GAME_OVER:
-                    self.handle_game_over()
-                elif self.game_state == self.GameStates.OPTIONS:
-                    self.handle_options()
-                elif self.game_state == self.GameStates.OPTIONS_ASK_RESET:
-                    self.handle_options_ask_reset()
-                elif self.game_state == self.GameStates.OPTIONS_ASK_SOUND:
-                    self.handle_options_ask_sound()
-                elif self.game_state == self.GameStates.INSERT_NAME:
-                    self.handle_insert_name()
+            # State machine
+            if self.game_state == self.GameStates.LOBBY:
+                self.handle_lobby()
+            elif self.game_state == self.GameStates.SEQUENCE_CREATE_UPDATE:
+                self.handle_sequence_create_update()
+            elif self.game_state == self.GameStates.SEQUENCE_PRESENTING:
+                self.handle_sequence_presenting()
+            elif self.game_state == self.GameStates.PLAYER_WAITING:
+                self.handle_player_waiting()
+            elif self.game_state == self.GameStates.GAME_OVER:
+                self.handle_game_over()
+            elif self.game_state == self.GameStates.OPTIONS:
+                self.handle_options()
+            elif self.game_state == self.GameStates.OPTIONS_ASK_RESET:
+                self.handle_options_ask_reset()
+            elif self.game_state == self.GameStates.OPTIONS_ASK_SOUND:
+                self.handle_options_ask_sound()
+            elif self.game_state == self.GameStates.INSERT_NAME:
+                self.handle_insert_name()
 
-                time.sleep_ms(10)  # Small delay per loop
+            time.sleep_ms(10)  # Small delay per loop
 
-            except KeyboardInterrupt:
-                print("\nGame stopped by user")
-                self.stop_leds()
-                self.no_tone()
-                break
-            except Exception as e:
-                print(f"Error in game loop: {e}")
-                time.sleep_ms(100)
+            #except Exception as e:
+            #    print(f"Error in game loop: {e}")
+            #    time.sleep_ms(100)
 
 
 def start():
