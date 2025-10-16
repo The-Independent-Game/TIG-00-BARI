@@ -526,53 +526,70 @@ class TIG00:
         self.end_game_melody()
         self.change_game_state(self.GameStates.LOBBY)
 
-    def go(self):
-        """Loop principale del gioco"""
-        print("Starting TIG-00 BARI game...")
-        self.change_game_state(self.GameStates.LOBBY)
+    def loop(self):
+        self.read_buttons()
 
-        while True:
-            #try:
-            # Leggi i pulsanti
-            self.read_buttons()
+        # Menu opzioni (tutti i pulsanti premuti)
+        if self.are_all_buttons_pressed() and self.game_state != self.GameStates.OPTIONS:
+            self.reset_button_states()
+            self.change_game_state(self.GameStates.OPTIONS)
 
-            # Menu opzioni (tutti i pulsanti premuti)
-            if self.are_all_buttons_pressed() and self.game_state != self.GameStates.OPTIONS:
-                self.reset_button_states()
-                self.change_game_state(self.GameStates.OPTIONS)
+        # State machine
+        if self.game_state == self.GameStates.LOBBY:
+            self.handle_lobby()
+        elif self.game_state == self.GameStates.SEQUENCE_CREATE_UPDATE:
+            self.handle_sequence_create_update()
+        elif self.game_state == self.GameStates.SEQUENCE_PRESENTING:
+            self.handle_sequence_presenting()
+        elif self.game_state == self.GameStates.PLAYER_WAITING:
+            self.handle_player_waiting()
+        elif self.game_state == self.GameStates.GAME_OVER:
+            self.handle_game_over()
+        elif self.game_state == self.GameStates.OPTIONS:
+            self.handle_options()
+        elif self.game_state == self.GameStates.OPTIONS_ASK_RESET:
+            self.handle_options_ask_reset()
+        elif self.game_state == self.GameStates.OPTIONS_ASK_SOUND:
+            self.handle_options_ask_sound()
+        elif self.game_state == self.GameStates.INSERT_NAME:
+            self.handle_insert_name()
 
-            # State machine
-            if self.game_state == self.GameStates.LOBBY:
-                self.handle_lobby()
-            elif self.game_state == self.GameStates.SEQUENCE_CREATE_UPDATE:
-                self.handle_sequence_create_update()
-            elif self.game_state == self.GameStates.SEQUENCE_PRESENTING:
-                self.handle_sequence_presenting()
-            elif self.game_state == self.GameStates.PLAYER_WAITING:
-                self.handle_player_waiting()
-            elif self.game_state == self.GameStates.GAME_OVER:
-                self.handle_game_over()
-            elif self.game_state == self.GameStates.OPTIONS:
-                self.handle_options()
-            elif self.game_state == self.GameStates.OPTIONS_ASK_RESET:
-                self.handle_options_ask_reset()
-            elif self.game_state == self.GameStates.OPTIONS_ASK_SOUND:
-                self.handle_options_ask_sound()
-            elif self.game_state == self.GameStates.INSERT_NAME:
-                self.handle_insert_name()
 
-            time.sleep_ms(10)  # Small delay per loop
+    def start(self):
+        """Main game entry point"""
+        print("Game Starting...")
 
-            #except Exception as e:
-            #    print(f"Error in game loop: {e}")
-            #    time.sleep_ms(100)
+        #Press GREEN to Enable SOUND 
+        if not self.buttons[2].pin.value(): # and self.is_button_pressed(1):
+            print("sound ON")
+            self.sound = True
+            self.tone(200, 200)
+            time.sleep(2);
+
+
+        loop_counter = 0
+        try:
+            self.change_game_state(self.GameStates.LOBBY)
+
+            while True:
+                self.loop()
+                time.sleep_ms(5)  # Small delay for stability
+
+                # Periodic garbage collection every ~10 seconds
+                loop_counter += 1
+                if loop_counter >= 2000:  # ~10s at 5ms per loop
+                    gc.collect()
+                    loop_counter = 0
+        except KeyboardInterrupt:
+            print("\nGame stopped")
 
 
 def start():
-    """Entry point per il launcher"""
-    game = TIG00()
-    game.go()
+    try:
+        game = TIG00()
+        game.start()
+    except Exception as e:
+        print(f"ERRORE: {type(e).__name__}: {e}")
+        import sys
+        sys.print_exception(e)
 
-
-if __name__ == "__main__":
-    start()
