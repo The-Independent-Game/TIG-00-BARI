@@ -81,7 +81,9 @@ class TIG00:
         self.level = 1
         self.game_sequence = [self.NO_BUTTON] * self.MAX_SEQUENCE_LENGTH
         self.game_state = self.GameStates.LOBBY
-        self.animation_button = 0
+        self.animation_sequence = [2, 3, 1, 0]  # Green, Red, Yellow, Blue
+        self.animation_sequence_index = -1  # Start at -1 so first increment gives 0
+        self.animation_button = self.animation_sequence[0]  # Initialize to first in sequence (Green)
         self.presenting_index = 0
         self.player_playing_index = 0
         self.need_wait = False
@@ -94,7 +96,7 @@ class TIG00:
         # Record e settings
         self.record = 0
         self.record_name = ""
-        self.sound = True
+        self.sound = False
         self.name_index = 0
         self.name_letter = 'A'
 
@@ -166,17 +168,15 @@ class TIG00:
 
     def tone(self, frequency, duration_ms=None):
         """Genera un tono con il buzzer"""
-        if not self.sound:
-            return
-        try:
+        if self.sound:
             self.buzzer.freq(frequency)
             self.buzzer.duty_u16(32768)  # 50% duty cycle
             self.buzzer_active = True
             if duration_ms:
                 time.sleep_ms(duration_ms)
                 self.no_tone()
-        except:
-            pass
+        else:
+            time.sleep_ms(duration_ms)
 
     def no_tone(self):
         """Ferma il tono del buzzer"""
@@ -281,8 +281,9 @@ class TIG00:
         """Animazione rotante nella lobby"""
         # Spegne tutti i LED prima di accendere il successivo
         self.stop_leds()
-        # Avanza all'animazione successiva
-        self.animation_button = (self.animation_button + 1) % 4
+        # Avanza all'animazione successiva usando la sequenza personalizzata
+        self.animation_sequence_index = (self.animation_sequence_index + 1) % len(self.animation_sequence)
+        self.animation_button = self.animation_sequence[self.animation_sequence_index]
         # Accende solo il LED corrente
         self.led_on(self.animation_button, False)
 
