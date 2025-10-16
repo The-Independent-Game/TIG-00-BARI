@@ -2,11 +2,10 @@ from machine import Pin, I2C, PWM
 import time
 import urandom
 import json
-
+import gc
 
 class TIG00:
-    """Gioco Simon Says per Raspberry Pi Pico 2W"""
-
+    
     # Pin definitions
     PIN_BUTTON_BLUE = 4
     PIN_BUTTON_YELLOW = 5
@@ -371,7 +370,8 @@ class TIG00:
             self.record_name = ""
             self.display_text([
                 "!! NEW RECORD !!",
-                "INSERT NAME"
+                "INSERT NAME",
+                "R:< Y:> B:OK G:DEL"
             ])
 
     def rewrite_name(self):
@@ -379,7 +379,9 @@ class TIG00:
         self.display_text([
             "INSERT NAME",
             self.record_name,
-            self.name_letter
+            self.name_letter,
+            "",
+            "R:< Y:> B:OK G:DEL"
         ])
 
     def handle_lobby(self):
@@ -501,24 +503,24 @@ class TIG00:
 
     def handle_insert_name(self):
         """Gestisce l'inserimento del nome per il record"""
-        if self.is_button_pressed(0):  # Y - Back
-            if len(self.record_name) > 0:
-                self.record_name = self.record_name[:-1]
-            self.rewrite_name()
-        elif self.is_button_pressed(1):  # G - Prev letter
+        if self.is_button_pressed(3):  # Red - Prev letter
             if self.name_letter > 'A':
                 self.name_letter = chr(ord(self.name_letter) - 1)
             self.rewrite_name()
-        elif self.is_button_pressed(2):  # B - Confirm
+        elif self.is_button_pressed(1):  # Yellow - Next letter
+            if self.name_letter < 'Z':
+                self.name_letter = chr(ord(self.name_letter) + 1)
+            self.rewrite_name()
+        elif self.is_button_pressed(0):  # Blue - Confirm
             if len(self.record_name) < 3:
                 self.record_name += self.name_letter
                 self.rewrite_name()
             else:
                 self._save_record()
                 self.change_game_state(self.GameStates.LOBBY)
-        elif self.is_button_pressed(3):  # R - Next letter
-            if self.name_letter < 'Z':
-                self.name_letter = chr(ord(self.name_letter) + 1)
+        elif self.is_button_pressed(2):  # Green - Delete
+            if len(self.record_name) > 0:
+                self.record_name = self.record_name[:-1]
             self.rewrite_name()
 
     def handle_game_over(self):
