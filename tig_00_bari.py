@@ -109,6 +109,7 @@ class TIG00:
         # Game session e record tracking
         self.game_session = None
         self.is_top_record = False
+        self.online = False  # Will be set by start()
 
         print("TIGNew initialized")
 
@@ -178,14 +179,23 @@ class TIG00:
             color_name = self.color_names[led_index]
             # Centra il nome del colore (circa 16 caratteri per riga)
             centered_color = color_name.center(16)
-            self.display_text([
-                f"Level  {self.level}",
-                "",
-                f"Record {self.record}",
-                f"By {self.record_name}",
-                "",
-                centered_color
-            ])
+            if self.online:
+                self.display_text([
+                    f"Level  {self.level}",
+                    "",
+                    f"Record {self.record}",
+                    f"By {self.record_name}",
+                    "",
+                    centered_color
+                ])
+            else:
+                self.display_text([
+                    f"Level  {self.level}",
+                    "",
+                    "OFFLINE MODE",
+                    "",
+                    centered_color
+                ])
 
         if execute_sound:
             self.tone(button.tone)
@@ -318,14 +328,23 @@ class TIG00:
 
         if new_state == self.GameStates.LOBBY:
             self.level = 1
-            self.display_text([
-                "TIG-00",
-                "",
-                "Press a button",
-                "",
-                f"Record {self.record}",
-                f"By {self.record_name}"
-            ])
+            if self.online:
+                self.display_text([
+                    "TIG-00",
+                    "",
+                    "Press a button",
+                    "",
+                    f"Record {self.record}",
+                    f"By {self.record_name}"
+                ])
+            else:
+                self.display_text([
+                    "TIG-00",
+                    "",
+                    "Press a button",
+                    "",
+                    "OFFLINE MODE"
+                ])
 
         elif new_state == self.GameStates.OPTIONS:
             self.no_tone()
@@ -351,12 +370,19 @@ class TIG00:
             ])
 
         elif new_state == self.GameStates.SEQUENCE_CREATE_UPDATE:
-            self.display_text([
-                f"Level  {self.level}",
-                "",
-                f"Record {self.record}",
-                f"By {self.record_name}"
-            ])
+            if self.online:
+                self.display_text([
+                    f"Level  {self.level}",
+                    "",
+                    f"Record {self.record}",
+                    f"By {self.record_name}"
+                ])
+            else:
+                self.display_text([
+                    f"Level  {self.level}",
+                    "",
+                    "OFFLINE MODE"
+                ])
 
         elif new_state == self.GameStates.SEQUENCE_PRESENTING:
             self.presenting_index = -1
@@ -447,12 +473,19 @@ class TIG00:
         """Gestisce l'input del giocatore"""
         # Pulisci display dopo 1 secondo dalla fine della sequenza
         if self.sequence_ended and self.sequence_end_delay_passed():
-            self.display_text([
-                f"Level  {self.level}",
-                "",
-                f"Record {self.record}",
-                f"By {self.record_name}"
-            ])
+            if self.online:
+                self.display_text([
+                    f"Level  {self.level}",
+                    "",
+                    f"Record {self.record}",
+                    f"By {self.record_name}"
+                ])
+            else:
+                self.display_text([
+                    f"Level  {self.level}",
+                    "",
+                    "OFFLINE MODE"
+                ])
             self.sequence_ended = False
 
         if self.player_waiting_timeout():
@@ -461,16 +494,21 @@ class TIG00:
             if self.sound:
                 self.tone(self.tones[4])
             time.sleep(1)
-            # Verifica se è un nuovo record prima di andare a GAME_OVER
-            self.is_top_record = self.game_ended(self.game_session, self.level)
-            if self.is_top_record:
-                self.record = self.level
-                self.name_letter = 'A'
-                self.record_name = ""
-                self.end_game_melody()
-                self.change_game_state(self.GameStates.INSERT_NAME)
-                self.rewrite_name()
+
+            # Gestione record solo in modalità online
+            if self.online:
+                self.is_top_record = self.game_ended(self.game_session, self.level)
+                if self.is_top_record:
+                    self.record = self.level
+                    self.name_letter = 'A'
+                    self.record_name = ""
+                    self.end_game_melody()
+                    self.change_game_state(self.GameStates.INSERT_NAME)
+                    self.rewrite_name()
+                else:
+                    self.change_game_state(self.GameStates.GAME_OVER)
             else:
+                # Modalità offline - vai direttamente a GAME_OVER
                 self.change_game_state(self.GameStates.GAME_OVER)
         else:
             if self.playing_passed() or self.any_button_pressed():
@@ -492,17 +530,21 @@ class TIG00:
                                 button_pressed_found = True
                                 break
                             else:
-                                # Errore - chiama game_ended per verificare se è un nuovo record
-                                self.is_top_record = self.game_ended(self.game_session, self.level)
+                                # Errore - gestione record solo in modalità online
+                                if self.online:
+                                    self.is_top_record = self.game_ended(self.game_session, self.level)
 
-                                if self.is_top_record:
-                                    self.record = self.level
-                                    self.name_letter = 'A'
-                                    self.record_name = ""
-                                    self.end_game_melody()
-                                    self.change_game_state(self.GameStates.INSERT_NAME)
-                                    self.rewrite_name()
+                                    if self.is_top_record:
+                                        self.record = self.level
+                                        self.name_letter = 'A'
+                                        self.record_name = ""
+                                        self.end_game_melody()
+                                        self.change_game_state(self.GameStates.INSERT_NAME)
+                                        self.rewrite_name()
+                                    else:
+                                        self.change_game_state(self.GameStates.GAME_OVER)
                                 else:
+                                    # Modalità offline - vai direttamente a GAME_OVER
                                     self.change_game_state(self.GameStates.GAME_OVER)
                                 break
 
@@ -591,22 +633,29 @@ class TIG00:
 
     def submit_name(self, game_id, nome):
         """Chiama submit-name per registrare il nome (max 5 lettere)"""
+        if not self.online:
+            # Modalità offline - salva nome nel record locale
+            print(f"Modalità offline - salvo nome '{nome}' nel record locale")
+            self.record_name = nome
+            self._save_record()
+            return True
+
         url = f"{SUPABASE_URL}/functions/v1/submit-name"
-        
+
         headers = {
             "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
             "apikey": SUPABASE_ANON_KEY,
             "Content-Type": "application/json"
         }
-        
+
         body = json.dumps({
             "game_id": game_id,
             "player_name": nome.upper()[:5]  # Max 5 lettere maiuscole
         })
-        
+
         try:
             response = urequests.post(url, headers=headers, data=body)
-            
+
             if response.status_code == 200:
                 print(f"Nome '{nome}' registrato nella classifica!")
                 response.close()
@@ -615,29 +664,34 @@ class TIG00:
                 print(f"Errore: {response.status_code}")
                 response.close()
                 return False
-                
+
         except Exception as e:
             print(f"Errore: {e}")
             return False
 
     def get_top_score(self):
         """Ottiene il primo classificato"""
+        if not self.online:
+            # Modalità offline - usa record locale
+            print("Modalità offline - uso record locale")
+            return self.record_name, self.record
+
         url = f"{SUPABASE_URL}/functions/v1/get-top-score"
-        
+
         headers = {
             "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
             "apikey": SUPABASE_ANON_KEY,
             "Content-Type": "application/json"
         }
-        
+
         try:
             print("Chiamata a get-top-score...")
             response = urequests.get(url, headers=headers)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 top_score = data.get("topScore")
-                
+
                 if top_score:
                     player = top_score.get("player_name")
                     score = top_score.get("score")
@@ -650,7 +704,7 @@ class TIG00:
                 print(f"Errore: {response.status_code}")
                 print(response.text)
                 return None, None
-                
+
         except Exception as e:
             print(f"Errore durante la chiamata: {e}")
             return None, None
@@ -659,18 +713,23 @@ class TIG00:
 
     def game_started(self):
         """Chiama start-game per ottenere un game_id"""
+        if not self.online:
+            # Modalità offline - nessuna sessione online
+            print("Modalità offline - nessuna sessione online")
+            return None
+
         url = f"{SUPABASE_URL}/functions/v1/start-game"
-        
+
         headers = {
             "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
             "apikey": SUPABASE_ANON_KEY,
             "Content-Type": "application/json"
         }
-        
+
         try:
             print("Inizio nuovo gioco...")
             response = urequests.post(url, headers=headers)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 game_id = data["game_id"]
@@ -682,30 +741,40 @@ class TIG00:
                 print(response.text)
                 response.close()
                 return None
-                
+
         except Exception as e:
             print(f"Errore nella richiesta: {e}")
             return None
         
     def game_ended(self, game_id, punteggio):
         """Chiama end-game per salvare il punteggio"""
+        if not self.online:
+            # Modalità offline - confronta con record locale
+            print(f"Modalità offline - punteggio: {punteggio}, record locale: {self.record}")
+            if punteggio > self.record:
+                print("🏆 NUOVO RECORD LOCALE!")
+                return True
+            else:
+                print("Non è un nuovo record")
+                return False
+
         url = f"{SUPABASE_URL}/functions/v1/end-game"
-        
+
         headers = {
             "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
             "apikey": SUPABASE_ANON_KEY,
             "Content-Type": "application/json"
         }
-        
+
         body = json.dumps({
             "game_id": game_id,
             "score": punteggio
         })
-        
+
         try:
             print(f"Salvataggio punteggio: {punteggio}")
             response = urequests.post(url, headers=headers, data=body)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 print("Punteggio salvato!")
@@ -719,15 +788,17 @@ class TIG00:
                 print(f"Errore: {response.status_code}")
                 response.close()
                 return None
-                
+
         except Exception as e:
             print(f"Errore: {e}")
             return None
 
 
-    def start(self):
+    def start(self, online):
         """Main game entry point"""
         print("Game Starting...")
+
+        self.online = online
 
         #Press GREEN to switch SOUND mode 
         if not self.buttons[2].pin.value(): # and self.is_button_pressed(1):
@@ -739,7 +810,9 @@ class TIG00:
         loop_counter = 0
         scoreboard_counter = 0
         try:
-            self.record_name, self.record = self.get_top_score()
+            # Carica record solo se online
+            if self.online:
+                self.record_name, self.record = self.get_top_score()
             self.change_game_state(self.GameStates.LOBBY)
 
             while True:
@@ -752,20 +825,21 @@ class TIG00:
                     gc.collect()
                     loop_counter = 0
 
-                # Periodic leaderboard loading
-                scoreboard_counter += 1
-                if scoreboard_counter >= 5000:
-                    if self.start == self.GameStates.LOBBY:  
-                        self.record_name, self.record = self.get_top_score()
-                    scoreboard_counter = 0
+                # Periodic leaderboard loading (solo in modalità online)
+                if self.online:
+                    scoreboard_counter += 1
+                    if scoreboard_counter >= 5000:
+                        if self.game_state == self.GameStates.LOBBY:
+                            self.record_name, self.record = self.get_top_score()
+                        scoreboard_counter = 0
         except KeyboardInterrupt:
             print("\nGame stopped")
 
 
-def start():
+def start(online):
     try:
         game = TIG00()
-        game.start()
+        game.start(online)
     except Exception as e:
         print(f"ERRORE: {type(e).__name__}: {e}")
         import sys
