@@ -737,6 +737,7 @@ class TIG00:
             time.sleep(2);
 
         loop_counter = 0
+        scoreboard_counter = 0
         try:
             self.record_name, self.record = self.get_top_score()
             self.change_game_state(self.GameStates.LOBBY)
@@ -750,6 +751,13 @@ class TIG00:
                 if loop_counter >= 2000:  # ~10s at 5ms per loop
                     gc.collect()
                     loop_counter = 0
+
+                # Periodic leaderboard loading
+                scoreboard_counter += 1
+                if scoreboard_counter >= 5000:
+                    if self.start == self.GameStates.LOBBY:  
+                        self.record_name, self.record = self.get_top_score()
+                    scoreboard_counter = 0
         except KeyboardInterrupt:
             print("\nGame stopped")
 
