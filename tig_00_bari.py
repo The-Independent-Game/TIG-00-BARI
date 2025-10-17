@@ -37,9 +37,6 @@ class TIG00:
         SEQUENCE_PRESENTING = 2
         PLAYER_WAITING = 3
         GAME_OVER = 4
-        OPTIONS = 5
-        OPTIONS_ASK_RESET = 6
-        OPTIONS_ASK_SOUND = 7
         INSERT_NAME = 8
 
     class Button:
@@ -102,7 +99,7 @@ class TIG00:
         # Record e settings
         self.record = 0
         self.record_name = ""
-        self.sound = True
+        self.sound = False
         self.name_index = 0
         self.name_letter = 'A'
 
@@ -319,7 +316,7 @@ class TIG00:
             if note > 0:
                 self.stop_leds()
 
-    def update_top_1(self):
+    def update_master_record(self):
         self.display_text([
             "TIG-00",
             "",
@@ -337,7 +334,7 @@ class TIG00:
         if new_state == self.GameStates.LOBBY:
             self.level = 1
             if self.online:
-                self.update_top_1()
+                self.update_master_record()
             else:
                 self.display_text([
                     "TIG-00",
@@ -346,29 +343,6 @@ class TIG00:
                     "",
                     "OFFLINE MODE"
                 ])
-
-        elif new_state == self.GameStates.OPTIONS:
-            self.no_tone()
-            self.stop_leds()
-            self.display_text([
-                "OPTIONS",
-                "B-RESET RECORD",
-                "Y-SOUND",
-                "R-EXIT"
-            ])
-            time.sleep(2)
-
-        elif new_state == self.GameStates.OPTIONS_ASK_RESET:
-            self.display_text([
-                "RESET RECORD ?",
-                "B-YES R-NO"
-            ])
-
-        elif new_state == self.GameStates.OPTIONS_ASK_SOUND:
-            self.display_text([
-                "SOUND ?",
-                "B-YES R-NO"
-            ])
 
         elif new_state == self.GameStates.SEQUENCE_CREATE_UPDATE:
             if self.online:
@@ -551,33 +525,7 @@ class TIG00:
                                     self.change_game_state(self.GameStates.GAME_OVER)
                                 break
 
-    def handle_options(self):
-        """Gestisce il menu opzioni"""
-        if self.is_button_pressed(3):  # R - Exit
-            self.change_game_state(self.GameStates.LOBBY)
-        elif self.is_button_pressed(2):  # B - Reset
-            self.change_game_state(self.GameStates.OPTIONS_ASK_RESET)
-        elif self.is_button_pressed(0):  # Y - Sound
-            self.change_game_state(self.GameStates.OPTIONS_ASK_SOUND)
-
-    def handle_options_ask_reset(self):
-        """Conferma reset record"""
-        if self.is_button_pressed(2):  # B - Yes
-            self.record = 0
-            self.record_name = ""
-            self.change_game_state(self.GameStates.OPTIONS)
-        elif self.is_button_pressed(3):  # R - No
-            self.change_game_state(self.GameStates.OPTIONS)
-
-    def handle_options_ask_sound(self):
-        """Conferma impostazione suono"""
-        if self.is_button_pressed(2):  # B - Yes
-            self.sound = True
-            self.change_game_state(self.GameStates.OPTIONS)
-        elif self.is_button_pressed(3):  # R - No
-            self.sound = False
-            self.change_game_state(self.GameStates.OPTIONS)
-
+    
     def handle_insert_name(self):
         """Gestisce l'inserimento del nome per il record"""
         if self.is_button_pressed(3):  # Red - Prev letter
@@ -611,11 +559,6 @@ class TIG00:
     def loop(self):
         self.read_buttons()
 
-        # Menu opzioni (tutti i pulsanti premuti)
-        if self.are_all_buttons_pressed() and self.game_state != self.GameStates.OPTIONS:
-            self.reset_button_states()
-            self.change_game_state(self.GameStates.OPTIONS)
-
         # State machine
         if self.game_state == self.GameStates.LOBBY:
             self.handle_lobby()
@@ -627,12 +570,6 @@ class TIG00:
             self.handle_player_waiting()
         elif self.game_state == self.GameStates.GAME_OVER:
             self.handle_game_over()
-        elif self.game_state == self.GameStates.OPTIONS:
-            self.handle_options()
-        elif self.game_state == self.GameStates.OPTIONS_ASK_RESET:
-            self.handle_options_ask_reset()
-        elif self.game_state == self.GameStates.OPTIONS_ASK_SOUND:
-            self.handle_options_ask_sound()
         elif self.game_state == self.GameStates.INSERT_NAME:
             self.handle_insert_name()
 
@@ -828,7 +765,7 @@ class TIG00:
                     if scoreboard_counter >= 5000:
                         if self.game_state == self.GameStates.LOBBY:
                             self.record_name, self.record = self.get_top_score()
-                            self.update_top_1()
+                            self.update_master_record()
                         scoreboard_counter = 0
         except KeyboardInterrupt:
             print("\nGame stopped")
