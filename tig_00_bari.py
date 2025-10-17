@@ -62,6 +62,9 @@ class TIG00:
             self.Button(self.PIN_BUTTON_RED, 1200, self.PIN_LED_RED)        # Red
         ]
 
+        # Nomi dei colori per il display
+        self.color_names = ["Blue", "Yellow", "Green", "Red"]
+
         # LED interno
         self.internal_led = Pin(self.PIN_INTERNAL_LED, Pin.OUT)
 
@@ -95,7 +98,7 @@ class TIG00:
         # Record e settings
         self.record = 0
         self.record_name = ""
-        self.sound = False
+        self.sound = True
         self.name_index = 0
         self.name_letter = 'A'
 
@@ -189,6 +192,21 @@ class TIG00:
         #try:
         button = self.buttons[led_index]
         button.led.on()
+
+        # Mostra il colore sul display SOLO durante la presentazione della sequenza
+        if self.display and self.game_state == self.GameStates.SEQUENCE_PRESENTING:
+            color_name = self.color_names[led_index]
+            # Centra il nome del colore (circa 16 caratteri per riga)
+            centered_color = color_name.center(16)
+            self.display_text([
+                f"Level  {self.level}",
+                "",
+                f"Record {self.record}",
+                f"By {self.record_name}",
+                "",
+                centered_color
+            ])
+
         if execute_sound:
             self.tone(button.tone)
         self.playing_start()
@@ -561,13 +579,12 @@ class TIG00:
         """Main game entry point"""
         print("Game Starting...")
 
-        #Press GREEN to Enable SOUND 
+        #Press GREEN to switch SOUND mode 
         if not self.buttons[2].pin.value(): # and self.is_button_pressed(1):
             print("sound ON")
-            self.sound = True
+            self.sound = not self.sound
             self.tone(200, 200)
             time.sleep(2);
-
 
         loop_counter = 0
         try:
