@@ -20,7 +20,6 @@ class TIG00:
     PIN_BUZZER = 9
     PIN_SDA = 0
     PIN_SCL = 1
-    PIN_INTERNAL_LED = 25
 
     # I2C addresses
     I2C_DISPLAY_ADDR = 0x3C
@@ -28,8 +27,7 @@ class TIG00:
     # Constants
     NO_BUTTON = 255
     MAX_SEQUENCE_LENGTH = 25
-    RECORD_FILE = "record.json"
-
+    
     # Game states
     class GameStates:
         LOBBY = 0
@@ -64,9 +62,6 @@ class TIG00:
         # Nomi dei colori per il display
         self.color_names = ["Blue", "Yellow", "Green", "Red"]
 
-        # LED interno
-        self.internal_led = Pin(self.PIN_INTERNAL_LED, Pin.OUT)
-
         # Toni per melodie
         self.tones = [261, 277, 294, 311, 330, 349, 370, 392, 415, 440]
 
@@ -99,7 +94,7 @@ class TIG00:
         # Record e settings
         self.record = 0
         self.record_name = ""
-        self.sound = False
+        self.sound = True
         self.name_index = 0
         self.name_letter = 'A'
 
@@ -411,7 +406,8 @@ class TIG00:
             time.sleep_ms(1500)
             self.stop_leds()
             time.sleep_ms(500)
-            self.game_session = self.game_started()
+            # Avvia chiamata async per registrare game_id
+            self.game_started_async()
             self.change_game_state(self.GameStates.SEQUENCE_CREATE_UPDATE)
 
     def handle_sequence_create_update(self):
@@ -527,25 +523,37 @@ class TIG00:
 
     
     def handle_insert_name(self):
-        """Gestisce l'inserimento del nome per il record"""
+        """Gestisce l'inserimento del nome per il record (max 8 caratteri)"""
         if self.is_button_pressed(3):  # Red - Prev letter
-            if self.name_letter > 'A':
+            if self.name_letter == 'A':
+                self.name_letter = '*'
+            elif self.name_letter == '*':
+                self.name_letter = 'Z'
+            else:
                 self.name_letter = chr(ord(self.name_letter) - 1)
             self.rewrite_name()
         elif self.is_button_pressed(1):  # Yellow - Next letter
-            if self.name_letter < 'Z':
+            if self.name_letter == 'Z':
+                self.name_letter = '*'
+            elif self.name_letter == '*':
+                self.name_letter = 'A'
+            else:
                 self.name_letter = chr(ord(self.name_letter) + 1)
             self.rewrite_name()
         elif self.is_button_pressed(0):  # Blue - Confirm
-            if len(self.record_name) < 3:
-                self.record_name += self.name_letter
-                self.rewrite_name()
-            else:
+            if self.name_letter == '*' or len(self.record_name) >= 8:
+                # Conferma e completa il nome
+                if self.name_letter == '*' and len(self.record_name) < 8:
+                    self.record_name += '*'
                 if self.is_top_record:
-                    self.submit_name(self.game_session,self.record_name)
-                    # Ricarica il top score dal server per mostrare il primo classificato
+                    self.submit_name(self.game_session, self.record_name)
                     self.record_name, self.record = self.get_top_score()
                 self.change_game_state(self.GameStates.LOBBY)
+            else:
+                # Aggiunge la lettera corrente (max 8 caratteri)
+                if len(self.record_name) < 8:
+                    self.record_name += self.name_letter
+                self.rewrite_name()
         elif self.is_button_pressed(2):  # Green - Delete
             if len(self.record_name) > 0:
                 self.record_name = self.record_name[:-1]
@@ -574,42 +582,36 @@ class TIG00:
             self.handle_insert_name()
 
     def submit_name(self, game_id, nome):
-        """Chiama submit-name per registrare il nome (max 5 lettere)"""
-        if not self.online:
-            # Modalità offline - salva nome nel record locale
-            print(f"Modalità offline - salvo nome '{nome}' nel record locale")
-            self.record_name = nome
-            self._save_record()
-            return True
+        nome_pulito = nome.rstrip('*')
 
-        url = f"{SUPABASE_URL}/functions/v1/submit-name"
+        if self.online and game_id:
+            
+            url = f"{SUPABASE_URL}/functions/v1/submit-name"
 
-        headers = {
-            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
-            "apikey": SUPABASE_ANON_KEY,
-            "Content-Type": "application/json"
-        }
+            headers = {
+                "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+                "apikey": SUPABASE_ANON_KEY,
+                "Content-Type": "application/json"
+            }
 
-        body = json.dumps({
-            "game_id": game_id,
-            "player_name": nome.upper()[:5]  # Max 5 lettere maiuscole
-        })
+            body = json.dumps({
+                "game_id": game_id,
+                "player_name": nome_pulito
+            })
 
-        try:
-            response = urequests.post(url, headers=headers, data=body)
+            try:
+                response = urequests.post(url, headers=headers, data=body)
 
-            if response.status_code == 200:
-                print(f"Nome '{nome}' registrato nella classifica!")
-                response.close()
-                return True
-            else:
-                print(f"Errore: {response.status_code}")
-                response.close()
+                if response.status_code == 200:
+                    print(f"Nome '{nome}' registrato nella classifica!")
+                    response.close()
+                else:
+                    print(f"Errore: {response.status_code}")
+                    return False
+
+            except Exception as e:
+                print(f"Errore: {e}")
                 return False
-
-        except Exception as e:
-            print(f"Errore: {e}")
-            return False
 
     def get_top_score(self):
         """Ottiene il primo classificato"""
@@ -655,13 +657,27 @@ class TIG00:
             if response:
                 response.close()
 
-    def game_started(self):
-        """Chiama start-game per ottenere un game_id"""
+    def game_started_async(self):
+        """Avvia la chiamata a start-game in modo asincrono (fire-and-forget)"""
         if not self.online:
-            # Modalità offline - nessuna sessione online
-            print("Modalità offline - nessuna sessione online")
-            return None
+            return
 
+        try:
+            # Tenta di usare threading se disponibile
+            import _thread
+            _thread.start_new_thread(self._game_started_thread, ())
+            print("Chiamata game_started in background (threaded)")
+        except ImportError:
+            # Threading non disponibile - esegui comunque ma non bloccare troppo
+            print("Threading non disponibile - chiamata diretta")
+            try:
+                self._game_started_thread()
+            except:
+                # Ignora errori per non bloccare il gioco
+                print("Errore in game_started, continuo comunque")
+
+    def _game_started_thread(self):
+        self.game_session = None
         url = f"{SUPABASE_URL}/functions/v1/start-game"
 
         headers = {
@@ -671,28 +687,24 @@ class TIG00:
         }
 
         try:
-            print("Inizio nuovo gioco...")
+            print("new game started on server...")
             response = urequests.post(url, headers=headers)
 
             if response.status_code == 200:
                 data = response.json()
                 game_id = data["game_id"]
-                print(f"Gioco iniziato! Game ID: {game_id}")
+                print(f"game started! ID: {game_id}")
+                self.game_session = game_id
                 response.close()
-                return game_id
             else:
-                print(f"Errore: {response.status_code}")
-                print(response.text)
+                print(f"Error: {response.status_code}")
                 response.close()
-                return None
 
         except Exception as e:
-            print(f"Errore nella richiesta: {e}")
-            return None
+            print(f"Error in start-game: {e}")
         
     def game_ended(self, game_id, punteggio):
-        """end-game per salvare il punteggio"""
-        if self.online:
+        if self.online and game_id:
             
             url = f"{SUPABASE_URL}/functions/v1/end-game"
 
