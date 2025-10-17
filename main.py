@@ -36,8 +36,8 @@ def connect_wifi():
     return False
 
 def main():
-    connect_wifi()
-    tig_00_bari.start()
+    connected = connect_wifi()
+    tig_00_bari.start(connected)
 
 if __name__ == "__main__":
     main()
