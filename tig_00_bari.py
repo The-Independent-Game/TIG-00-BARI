@@ -470,24 +470,26 @@ class TIG00:
             self.stop_leds()
             self.need_wait = False
 
+    def stop_button_label_on_show_sequence(self):
+        if self.online:
+            self.display_text([
+                f"Level  {self.level}",
+                "",
+                f"Record {self.record}",
+                f"By {self.record_name}"
+            ])
+        else:
+            self.display_text([
+                f"Level  {self.level}",
+                "",
+                "OFFLINE MODE"
+            ])
+        self.sequence_ended = False
+
     def handle_player_waiting(self):
-        """Gestisce l'input del giocatore"""
         # Pulisci display dopo 1 secondo dalla fine della sequenza
         if self.sequence_ended and self.sequence_end_delay_passed():
-            if self.online:
-                self.display_text([
-                    f"Level  {self.level}",
-                    "",
-                    f"Record {self.record}",
-                    f"By {self.record_name}"
-                ])
-            else:
-                self.display_text([
-                    f"Level  {self.level}",
-                    "",
-                    "OFFLINE MODE"
-                ])
-            self.sequence_ended = False
+            self.stop_button_label_on_show_sequence()
 
         if self.player_waiting_timeout():
             print("Player TIMEOUT")
@@ -513,6 +515,7 @@ class TIG00:
                 self.change_game_state(self.GameStates.GAME_OVER)
         else:
             if self.playing_passed() or self.any_button_pressed():
+                self.stop_button_label_on_show_sequence()
                 self.stop_leds()
 
                 if self.game_sequence[self.player_playing_index] == self.NO_BUTTON:
@@ -686,6 +689,7 @@ class TIG00:
             "Content-Type": "application/json"
         }
 
+        response = None
         try:
             print("get-top-score")
             response = urequests.get(url, headers=headers)
@@ -711,7 +715,8 @@ class TIG00:
             print(f"Errore durante la chiamata: {e}")
             return None, None
         finally:
-            response.close()
+            if response:
+                response.close()
 
     def game_started(self):
         """Chiama start-game per ottenere un game_id"""
