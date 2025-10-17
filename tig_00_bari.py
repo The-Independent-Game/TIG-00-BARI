@@ -109,9 +109,7 @@ class TIG00:
         # Game session e record tracking
         self.game_session = None
         self.is_top_record = False
-        self.online = False  # Will be set by start()
-
-        print("TIGNew initialized")
+        self.online = False  # Will be set by caller
 
     def _init_display(self):
         """Inizializza il display SSD1306"""
@@ -321,6 +319,16 @@ class TIG00:
             if note > 0:
                 self.stop_leds()
 
+    def update_top_1(self):
+        self.display_text([
+            "TIG-00",
+            "",
+            "Press a button",
+            "",
+            f"Record {self.record}",
+            f"By {self.record_name}"
+        ])
+
     def change_game_state(self, new_state):
         """Cambia lo stato del gioco"""
         #print(f"State change: {self.game_state} -> {new_state}")
@@ -329,14 +337,7 @@ class TIG00:
         if new_state == self.GameStates.LOBBY:
             self.level = 1
             if self.online:
-                self.display_text([
-                    "TIG-00",
-                    "",
-                    "Press a button",
-                    "",
-                    f"Record {self.record}",
-                    f"By {self.record_name}"
-                ])
+                self.update_top_1()
             else:
                 self.display_text([
                     "TIG-00",
@@ -515,7 +516,6 @@ class TIG00:
                 self.stop_leds()
 
                 if self.game_sequence[self.player_playing_index] == self.NO_BUTTON:
-                    print("New Level")
                     time.sleep_ms(500)
                     self.level += 1
                     self.change_game_state(self.GameStates.SEQUENCE_CREATE_UPDATE)
@@ -592,6 +592,8 @@ class TIG00:
             else:
                 if self.is_top_record:
                     self.submit_name(self.game_session,self.record_name)
+                    # Ricarica il top score dal server per mostrare il primo classificato
+                    self.record_name, self.record = self.get_top_score()
                 self.change_game_state(self.GameStates.LOBBY)
         elif self.is_button_pressed(2):  # Green - Delete
             if len(self.record_name) > 0:
@@ -685,7 +687,7 @@ class TIG00:
         }
 
         try:
-            print("Chiamata a get-top-score...")
+            print("get-top-score")
             response = urequests.get(url, headers=headers)
 
             if response.status_code == 200:
@@ -747,51 +749,41 @@ class TIG00:
             return None
         
     def game_ended(self, game_id, punteggio):
-        """Chiama end-game per salvare il punteggio"""
-        if not self.online:
-            # Modalità offline - confronta con record locale
-            print(f"Modalità offline - punteggio: {punteggio}, record locale: {self.record}")
-            if punteggio > self.record:
-                print("🏆 NUOVO RECORD LOCALE!")
-                return True
-            else:
-                print("Non è un nuovo record")
-                return False
+        """end-game per salvare il punteggio"""
+        if self.online:
+            
+            url = f"{SUPABASE_URL}/functions/v1/end-game"
 
-        url = f"{SUPABASE_URL}/functions/v1/end-game"
+            headers = {
+                "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+                "apikey": SUPABASE_ANON_KEY,
+                "Content-Type": "application/json"
+            }
 
-        headers = {
-            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
-            "apikey": SUPABASE_ANON_KEY,
-            "Content-Type": "application/json"
-        }
+            body = json.dumps({
+                "game_id": game_id,
+                "score": punteggio
+            })
 
-        body = json.dumps({
-            "game_id": game_id,
-            "score": punteggio
-        })
+            try:
+                print(f"Salvataggio punteggio: {punteggio}")
+                response = urequests.post(url, headers=headers, data=body)
 
-        try:
-            print(f"Salvataggio punteggio: {punteggio}")
-            response = urequests.post(url, headers=headers, data=body)
-
-            if response.status_code == 200:
-                data = response.json()
-                print("Punteggio salvato!")
-                if data.get("is_top_record"):
-                    print("🏆 NUOVO RECORD! Inserisci il nome.")
+                if response.status_code == 200:
+                    data = response.json()
+                    response.close()
+                    return data.get("is_top_record")
                 else:
-                    print("is not top")
-                response.close()
-                return data.get("is_top_record")
-            else:
-                print(f"Errore: {response.status_code}")
-                response.close()
-                return None
+                    print(f"Errore: {response.status_code}")
+                    response.close()
+                    return False
 
-        except Exception as e:
-            print(f"Errore: {e}")
-            return None
+            except Exception as e:
+                print(f"Errore: {e}")
+                return False
+        else:
+
+            return False
 
 
     def start(self, online):
@@ -831,6 +823,7 @@ class TIG00:
                     if scoreboard_counter >= 5000:
                         if self.game_state == self.GameStates.LOBBY:
                             self.record_name, self.record = self.get_top_score()
+                            self.update_top_1()
                         scoreboard_counter = 0
         except KeyboardInterrupt:
             print("\nGame stopped")
