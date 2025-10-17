@@ -3,6 +3,8 @@ import time
 import urandom
 import json
 import gc
+import urequests
+from lovable import SUPABASE_URL, SUPABASE_ANON_KEY
 
 class TIG00:
     
@@ -102,8 +104,9 @@ class TIG00:
         self.name_index = 0
         self.name_letter = 'A'
 
-        # Carica record salvato
-        self._load_record()
+        # Game session e record tracking
+        self.game_session = None
+        self.is_top_record = False
 
         print("TIGNew initialized")
 
@@ -128,31 +131,6 @@ class TIG00:
             print(f"Display init error: {e}")
             self.display = None
 
-    def _load_record(self):
-        """Carica il record dal file JSON"""
-        try:
-            with open(self.RECORD_FILE, 'r') as f:
-                data = json.load(f)
-                self.record = data.get('record', 0)
-                self.record_name = data.get('name', '')
-                print(f"Record loaded: {self.record} by {self.record_name}")
-        except:
-            self.record = 0
-            self.record_name = ""
-            print("No record found, starting fresh")
-
-    def _save_record(self):
-        """Salva il record su file JSON"""
-        try:
-            data = {
-                'record': self.record,
-                'name': self.record_name
-            }
-            with open(self.RECORD_FILE, 'w') as f:
-                json.dump(data, f)
-            print(f"Record saved: {self.record} by {self.record_name}")
-        except Exception as e:
-            print(f"Error saving record: {e}")
 
     def display_text(self, lines):
         """Mostra testo sul display (array di stringhe)"""
@@ -325,11 +303,10 @@ class TIG00:
 
     def change_game_state(self, new_state):
         """Cambia lo stato del gioco"""
-        print(f"State change: {self.game_state} -> {new_state}")
+        #print(f"State change: {self.game_state} -> {new_state}")
         self.game_state = new_state
 
         if new_state == self.GameStates.LOBBY:
-            self._load_record()
             self.level = 1
             self.display_text([
                 "TIG-00",
@@ -422,6 +399,7 @@ class TIG00:
             time.sleep_ms(1500)
             self.stop_leds()
             time.sleep_ms(500)
+            self.game_session = self.game_started()
             self.change_game_state(self.GameStates.SEQUENCE_CREATE_UPDATE)
 
     def handle_sequence_create_update(self):
@@ -458,7 +436,17 @@ class TIG00:
             if self.sound:
                 self.tone(self.tones[4])
             time.sleep(1)
-            self.change_game_state(self.GameStates.GAME_OVER)
+            # Verifica se è un nuovo record prima di andare a GAME_OVER
+            self.is_top_record = self.game_ended(self.game_session, self.level)
+            if self.is_top_record:
+                self.record = self.level
+                self.name_letter = 'A'
+                self.record_name = ""
+                self.end_game_melody()
+                self.change_game_state(self.GameStates.INSERT_NAME)
+                self.rewrite_name()
+            else:
+                self.change_game_state(self.GameStates.GAME_OVER)
         else:
             if self.playing_passed() or self.any_button_pressed():
                 self.stop_leds()
@@ -479,8 +467,10 @@ class TIG00:
                                 button_pressed_found = True
                                 break
                             else:
-                                # Errore - controlla se nuovo record
-                                if self.level > self.record:
+                                # Errore - chiama game_ended per verificare se è un nuovo record
+                                self.is_top_record = self.game_ended(self.game_session, self.level)
+
+                                if self.is_top_record:
                                     self.record = self.level
                                     self.name_letter = 'A'
                                     self.record_name = ""
@@ -505,7 +495,6 @@ class TIG00:
         if self.is_button_pressed(2):  # B - Yes
             self.record = 0
             self.record_name = ""
-            self._save_record()
             self.change_game_state(self.GameStates.OPTIONS)
         elif self.is_button_pressed(3):  # R - No
             self.change_game_state(self.GameStates.OPTIONS)
@@ -534,7 +523,8 @@ class TIG00:
                 self.record_name += self.name_letter
                 self.rewrite_name()
             else:
-                self._save_record()
+                if self.is_top_record:
+                    self.submit_name(self.game_session,self.record_name)
                 self.change_game_state(self.GameStates.LOBBY)
         elif self.is_button_pressed(2):  # Green - Delete
             if len(self.record_name) > 0:
@@ -573,6 +563,104 @@ class TIG00:
             self.handle_options_ask_sound()
         elif self.game_state == self.GameStates.INSERT_NAME:
             self.handle_insert_name()
+
+    def submit_name(self, game_id, nome):
+        """Chiama submit-name per registrare il nome (max 5 lettere)"""
+        url = f"{SUPABASE_URL}/functions/v1/submit-name"
+        
+        headers = {
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "apikey": SUPABASE_ANON_KEY,
+            "Content-Type": "application/json"
+        }
+        
+        body = json.dumps({
+            "game_id": game_id,
+            "player_name": nome.upper()[:5]  # Max 5 lettere maiuscole
+        })
+        
+        try:
+            response = urequests.post(url, headers=headers, data=body)
+            
+            if response.status_code == 200:
+                print(f"Nome '{nome}' registrato nella classifica!")
+                response.close()
+                return True
+            else:
+                print(f"Errore: {response.status_code}")
+                response.close()
+                return False
+                
+        except Exception as e:
+            print(f"Errore: {e}")
+            return False
+
+    def game_started(self):
+        """Chiama start-game per ottenere un game_id"""
+        url = f"{SUPABASE_URL}/functions/v1/start-game"
+        
+        headers = {
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "apikey": SUPABASE_ANON_KEY,
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            print("Inizio nuovo gioco...")
+            response = urequests.post(url, headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                game_id = data["game_id"]
+                print(f"Gioco iniziato! Game ID: {game_id}")
+                response.close()
+                return game_id
+            else:
+                print(f"Errore: {response.status_code}")
+                print(response.text)
+                response.close()
+                return None
+                
+        except Exception as e:
+            print(f"Errore nella richiesta: {e}")
+            return None
+        
+    def game_ended(self, game_id, punteggio):
+        """Chiama end-game per salvare il punteggio"""
+        url = f"{SUPABASE_URL}/functions/v1/end-game"
+        
+        headers = {
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "apikey": SUPABASE_ANON_KEY,
+            "Content-Type": "application/json"
+        }
+        
+        body = json.dumps({
+            "game_id": game_id,
+            "score": punteggio
+        })
+        
+        try:
+            print(f"Salvataggio punteggio: {punteggio}")
+            response = urequests.post(url, headers=headers, data=body)
+            
+            if response.status_code == 200:
+                data = response.json()
+                print("Punteggio salvato!")
+                if data.get("is_top_record"):
+                    print("🏆 NUOVO RECORD! Inserisci il nome.")
+                else:
+                    print("is not top")
+                response.close()
+                return data.get("is_top_record")
+            else:
+                print(f"Errore: {response.status_code}")
+                response.close()
+                return None
+                
+        except Exception as e:
+            print(f"Errore: {e}")
+            return None
 
 
     def start(self):
