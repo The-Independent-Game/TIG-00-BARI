@@ -91,11 +91,13 @@ class TIG00:
         self.presenting_index = 0
         self.player_playing_index = 0
         self.need_wait = False
+        self.sequence_ended = False
 
         # Timer
         self.timer_playing = 0
         self.timer_pause = 0
         self.timer_player_waiting = 0
+        self.timer_sequence_end = 0
 
         # Record e settings
         self.record = 0
@@ -273,6 +275,14 @@ class TIG00:
         """Avvia il timer di attesa del giocatore"""
         self.timer_player_waiting = self.millis()
 
+    def sequence_end_start(self):
+        """Avvia il timer per la fine della sequenza"""
+        self.timer_sequence_end = self.millis()
+
+    def sequence_end_delay_passed(self):
+        """Verifica se è passato 1 secondo dalla fine della sequenza"""
+        return time.ticks_diff(self.millis(), self.timer_sequence_end) >= 1000
+
     def rotate_animation(self):
         """Animazione rotante nella lobby"""
         # Spegne tutti i LED prima di accendere il successivo
@@ -351,6 +361,7 @@ class TIG00:
         elif new_state == self.GameStates.SEQUENCE_PRESENTING:
             self.presenting_index = -1
             self.need_wait = False
+            self.sequence_ended = False
 
         elif new_state == self.GameStates.PLAYER_WAITING:
             self.player_playing_index = 0
@@ -421,6 +432,10 @@ class TIG00:
                     self.led_on(current_button, True)
                     self.need_wait = True
                 else:
+                    # Sequenza finita - passa subito a PLAYER_WAITING
+                    # Il timer per pulire il display partirà in PLAYER_WAITING
+                    self.sequence_ended = True
+                    self.sequence_end_start()
                     self.change_game_state(self.GameStates.PLAYER_WAITING)
                     self.player_waiting_start()
         elif self.need_wait and self.playing_passed():
@@ -430,6 +445,16 @@ class TIG00:
 
     def handle_player_waiting(self):
         """Gestisce l'input del giocatore"""
+        # Pulisci display dopo 1 secondo dalla fine della sequenza
+        if self.sequence_ended and self.sequence_end_delay_passed():
+            self.display_text([
+                f"Level  {self.level}",
+                "",
+                f"Record {self.record}",
+                f"By {self.record_name}"
+            ])
+            self.sequence_ended = False
+
         if self.player_waiting_timeout():
             print("Player TIMEOUT")
             self.all_leds_on()
@@ -595,6 +620,43 @@ class TIG00:
             print(f"Errore: {e}")
             return False
 
+    def get_top_score(self):
+        """Ottiene il primo classificato"""
+        url = f"{SUPABASE_URL}/functions/v1/get-top-score"
+        
+        headers = {
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "apikey": SUPABASE_ANON_KEY,
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            print("Chiamata a get-top-score...")
+            response = urequests.get(url, headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                top_score = data.get("topScore")
+                
+                if top_score:
+                    player = top_score.get("player_name")
+                    score = top_score.get("score")
+                    print(f"Top player: {player} - Score: {score}")
+                    return player, score
+                else:
+                    print("Nessun record trovato")
+                    return None, None
+            else:
+                print(f"Errore: {response.status_code}")
+                print(response.text)
+                return None, None
+                
+        except Exception as e:
+            print(f"Errore durante la chiamata: {e}")
+            return None, None
+        finally:
+            response.close()
+
     def game_started(self):
         """Chiama start-game per ottenere un game_id"""
         url = f"{SUPABASE_URL}/functions/v1/start-game"
@@ -676,6 +738,7 @@ class TIG00:
 
         loop_counter = 0
         try:
+            self.record_name, self.record = self.get_top_score()
             self.change_game_state(self.GameStates.LOBBY)
 
             while True:
