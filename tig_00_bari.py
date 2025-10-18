@@ -218,83 +218,59 @@ class TIG00:
                 button.is_pressed = False
 
     def is_button_pressed(self, index):
-        """Verifica se un pulsante specifico � premuto"""
         return self.buttons[index].is_pressed
 
-    def are_all_buttons_pressed(self):
-        """Verifica se tutti i pulsanti sono premuti contemporaneamente (PULL_UP: 0=premuto)"""
-        count = sum(1 for btn in self.buttons if btn.pin.value() == 0)
-        return count == len(self.buttons)
-
     def reset_button_states(self):
-        """Reset dello stato di tutti i pulsanti"""
         for button in self.buttons:
             button.is_ready = True
             button.is_pressed = False
 
     def any_button_pressed(self):
-        """Verifica se almeno un pulsante � premuto"""
         return any(btn.is_pressed for btn in self.buttons)
 
     def random_button(self):
-        """Genera un indice casuale di pulsante"""
         return urandom.randint(0, 3)
 
     def penalty(self, base):
-        """Calcola la penalit� temporale basata sul livello"""
         difficulty = -1.0 / (self.level * self.level) + 0.5
         if difficulty > 0:
             return int(difficulty * base)
         return 0
 
     def millis(self):
-        """Restituisce il tempo in millisecondi"""
         return time.ticks_ms()
 
     def playing_passed(self):
-        """Verifica se � passato il tempo di presentazione"""
         return time.ticks_diff(self.millis(), self.timer_playing) >= (500 - self.penalty(400))
 
     def pause_passed(self):
-        """Verifica se � passata la pausa tra presentazioni"""
         return time.ticks_diff(self.millis(), self.timer_pause) >= (300 - self.penalty(200))
 
     def player_waiting_timeout(self):
-        """Verifica se il giocatore ha esaurito il tempo"""
         return time.ticks_diff(self.millis(), self.timer_player_waiting) >= 5000
 
     def playing_start(self):
-        """Avvia il timer di presentazione"""
         self.timer_playing = self.millis()
 
     def pause_start(self):
-        """Avvia il timer di pausa"""
         self.timer_pause = self.millis()
 
     def player_waiting_start(self):
-        """Avvia il timer di attesa del giocatore"""
         self.timer_player_waiting = self.millis()
 
     def sequence_end_start(self):
-        """Avvia il timer per la fine della sequenza"""
         self.timer_sequence_end = self.millis()
 
     def sequence_end_delay_passed(self):
-        """Verifica se è passato 1 secondo dalla fine della sequenza"""
         return time.ticks_diff(self.millis(), self.timer_sequence_end) >= 1000
 
     def rotate_animation(self):
-        """Animazione rotante nella lobby"""
-        # Spegne tutti i LED prima di accendere il successivo
         self.stop_leds()
-        # Avanza all'animazione successiva usando la sequenza personalizzata
         self.animation_sequence_index = (self.animation_sequence_index + 1) % len(self.animation_sequence)
         self.animation_button = self.animation_sequence[self.animation_sequence_index]
-        # Accende solo il LED corrente
         self.led_on(self.animation_button, False)
 
     def end_game_melody(self):
-        """Melodia di fine partita"""
         melody = [250, 196, 196, 220, 196, 0, 247, 250]
         note_durations = [4, 8, 8, 4, 4, 4, 4, 4]
 
@@ -322,8 +298,6 @@ class TIG00:
         ])
 
     def change_game_state(self, new_state):
-        """Cambia lo stato del gioco"""
-        #print(f"State change: {self.game_state} -> {new_state}")
         self.game_state = new_state
 
         if new_state == self.GameStates.LOBBY:
@@ -382,13 +356,11 @@ class TIG00:
             "INSERT NAME",
             self.record_name,
             self.name_letter,
-            "",
-            "R:< Y:> B:OK G:DEL"
+            "R:< Y:> B:OK",
+            "G:DEL *:END"
         ])
 
     def handle_lobby(self):
-        """Gestisce lo stato LOBBY"""
-        # Animazione casuale
         if urandom.randint(0, 400000) == 0:
             self.all_leds_on()
             if self.sound:
@@ -411,7 +383,6 @@ class TIG00:
             self.change_game_state(self.GameStates.SEQUENCE_CREATE_UPDATE)
 
     def handle_sequence_create_update(self):
-        """Crea/aggiorna la sequenza di gioco"""
         for n in range(self.level - 1, self.MAX_SEQUENCE_LENGTH):
             if n < self.level:
                 self.game_sequence[n] = self.random_button()
@@ -420,7 +391,6 @@ class TIG00:
         self.change_game_state(self.GameStates.SEQUENCE_PRESENTING)
 
     def handle_sequence_presenting(self):
-        """Presenta la sequenza al giocatore"""
         if self.playing_passed() and not self.need_wait:
             if self.pause_passed():
                 self.presenting_index += 1
@@ -759,12 +729,11 @@ class TIG00:
 
 
     def start(self, online):
-        """Main game entry point"""
         print("Game Starting...")
 
         self.online = online
 
-        #Press GREEN to switch SOUND mode 
+        #GREEN to switch SOUND mode 
         if not self.buttons[2].pin.value(): # and self.is_button_pressed(1):
             print("sound ON")
             self.sound = not self.sound
@@ -790,12 +759,12 @@ class TIG00:
                 # Periodic leaderboard loading 
                 if self.game_state == self.GameStates.LOBBY:
                     scoreboard_counter += 1
-                    if scoreboard_counter >= 5000:
+                    if scoreboard_counter >= 5000: # ~25s at 5ms per loop
                         self.get_top_score_async()
                     scoreboard_counter = 0
 
         except KeyboardInterrupt:
-            print("\nGame stopped")
+            print("Game stopped")
 
 
 def start(online):
