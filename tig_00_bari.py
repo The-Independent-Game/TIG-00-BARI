@@ -94,7 +94,7 @@ class TIG00:
         # Record e settings
         self.record = 0
         self.record_name = ""
-        self.sound = True
+        self.sound = False
         self.name_index = 0
         self.name_letter = 'A'
 
@@ -542,12 +542,13 @@ class TIG00:
             self.rewrite_name()
         elif self.is_button_pressed(0):  # Blue - Confirm
             if self.name_letter == '*' or len(self.record_name) >= 8:
-                # Conferma e completa il nome
-                if self.name_letter == '*' and len(self.record_name) < 8:
-                    self.record_name += '*'
                 if self.is_top_record:
                     self.submit_name(self.game_session, self.record_name)
-                    self.record_name, self.record = self.get_top_score()
+                    if self.level > self.record:
+                        self.record = self.level
+                    
+                    self.get_top_score_async()
+                
                 self.change_game_state(self.GameStates.LOBBY)
             else:
                 # Aggiunge la lettera corrente (max 8 caratteri)
@@ -613,12 +614,28 @@ class TIG00:
                 print(f"Errore: {e}")
                 return False
 
-    def get_top_score(self):
-        """Ottiene il primo classificato"""
+    def get_top_score_async(self):
+        """Avvia il caricamento del top score in modo asincrono (fire-and-forget)"""
         if not self.online:
-            # Modalità offline - usa record locale
-            print("Modalità offline - uso record locale")
-            return self.record_name, self.record
+            return
+
+        try:
+            # Tenta di usare threading se disponibile
+            import _thread
+            _thread.start_new_thread(self.get_top_score_thread, ())
+            print("Chiamata get_top_score in background (threaded)")
+        except ImportError:
+            # Threading non disponibile - esegui comunque ma non bloccare troppo
+            print("Threading non disponibile - chiamata diretta")
+            try:
+                self.get_top_score_thread()
+            except:
+                # Ignora errori per non bloccare il gioco
+                print("Errore in get_top_score, continuo comunque")
+
+    def get_top_score_thread(self):
+        if not self.online:
+            return
 
         url = f"{SUPABASE_URL}/functions/v1/get-top-score"
 
@@ -630,7 +647,7 @@ class TIG00:
 
         response = None
         try:
-            print("get-top-score")
+            print("get-top-score...")
             response = urequests.get(url, headers=headers)
 
             if response.status_code == 200:
@@ -641,18 +658,19 @@ class TIG00:
                     player = top_score.get("player_name")
                     score = top_score.get("score")
                     print(f"Top player: {player} - Score: {score}")
-                    return player, score
+                    self.record_name = player
+                    self.record = score
+                    # Aggiorna il display se siamo nella lobby
+                    if self.game_state == self.GameStates.LOBBY:
+                        self.update_master_record()
                 else:
                     print("Nessun record trovato")
-                    return None, None
+
             else:
                 print(f"Errore: {response.status_code}")
-                print(response.text)
-                return None, None
 
         except Exception as e:
-            print(f"Errore durante la chiamata: {e}")
-            return None, None
+            print(f"Errore durante get-top-score: {e}")
         finally:
             if response:
                 response.close()
@@ -756,9 +774,7 @@ class TIG00:
         loop_counter = 0
         scoreboard_counter = 0
         try:
-            # Carica record solo se online
-            if self.online:
-                self.record_name, self.record = self.get_top_score()
+            self.get_top_score_thread()
             self.change_game_state(self.GameStates.LOBBY)
 
             while True:
@@ -771,14 +787,13 @@ class TIG00:
                     gc.collect()
                     loop_counter = 0
 
-                # Periodic leaderboard loading (solo in modalità online)
-                if self.online:
+                # Periodic leaderboard loading 
+                if self.game_state == self.GameStates.LOBBY:
                     scoreboard_counter += 1
                     if scoreboard_counter >= 5000:
-                        if self.game_state == self.GameStates.LOBBY:
-                            self.record_name, self.record = self.get_top_score()
-                            self.update_master_record()
-                        scoreboard_counter = 0
+                        self.get_top_score_async()
+                    scoreboard_counter = 0
+
         except KeyboardInterrupt:
             print("\nGame stopped")
 
