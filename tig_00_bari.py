@@ -94,7 +94,7 @@ class TIG00:
         # Record e settings
         self.record = 0
         self.record_name = ""
-        self.sound = False
+        self.sound = True
         self.name_index = 0
         self.name_letter = 'A'
 
