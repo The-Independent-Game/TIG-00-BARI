@@ -18,3 +18,5 @@ The electronics are based on a RASPBERRY PICO 2 W board, which controls:
 1 LCD
 
 The outer structure is modular and designed to integrate with other games in the TIG series: it uses the same base and some of the same components, helping to reduce costs and waste.
+
+[Follow us](https://linktr.ee/TheIndependentGame)
