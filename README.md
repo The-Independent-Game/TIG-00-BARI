@@ -9,7 +9,7 @@ It’s a light and sound memory game: the device shows a sequence of colors and 
 🧩 How it’s made
 
 TIG-00 BARI is fully open-source and 3D printable.
-The electronics are based on an RASPBERRY PICO 2 W board, which controls:
+The electronics are based on a RASPBERRY PICO 2 W board, which controls:
 
 4 buttons with integrated LEDs (red, green, blue and yellow)
 
