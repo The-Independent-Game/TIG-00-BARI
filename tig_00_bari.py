@@ -182,7 +182,7 @@ class TIG00:
                 self.display_text([
                     f"Level  {self.level}",
                     "",
-                    "OFFLINE MODE",
+                    "", #"OFFLINE MODE",
                     "",
                     centered_color
                 ])
@@ -289,7 +289,7 @@ class TIG00:
 
     def update_master_record(self):
         self.display_text([
-            "TIG-00",
+            "TIG-00 : MAX ED.",
             "",
             "Press a button",
             "",
@@ -306,11 +306,11 @@ class TIG00:
                 self.update_master_record()
             else:
                 self.display_text([
-                    "TIG-00",
+                    "TIG-00 : MAX ED.",
                     "",
                     "Press a button",
                     "",
-                    "OFFLINE MODE"
+                    "", #"OFFLINE MODE"
                 ])
 
         elif new_state == self.GameStates.SEQUENCE_CREATE_UPDATE:
@@ -325,7 +325,7 @@ class TIG00:
                 self.display_text([
                     f"Level  {self.level}",
                     "",
-                    "OFFLINE MODE"
+                    "", # "OFFLINE MODE"
                 ])
 
         elif new_state == self.GameStates.SEQUENCE_PRESENTING:
@@ -422,7 +422,7 @@ class TIG00:
             self.display_text([
                 f"Level  {self.level}",
                 "",
-                "OFFLINE MODE"
+                "", #"OFFLINE MODE"
             ])
         self.sequence_ended = False
 
