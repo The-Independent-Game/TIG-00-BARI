@@ -20,3 +20,4 @@ The electronics are based on a RASPBERRY PICO 2 W board, which controls:
 The outer structure is modular and designed to integrate with other games in the TIG series: it uses the same base and some of the same components, helping to reduce costs and waste.
 
 [Follow us](https://linktr.ee/TheIndependentGame)
+<img width="2431" height="2435" alt="TIG-00 Bari - giallo" src="https://github.com/user-attachments/assets/a51755b6-792c-4874-a662-f8c27e36c550" />
