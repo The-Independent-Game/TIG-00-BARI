@@ -21,3 +21,4 @@ The outer structure is modular and designed to integrate with other games in the
 
 [Follow us](https://linktr.ee/TheIndependentGame)
 <img width="2431" height="2435" alt="TIG-00 Bari - giallo" src="https://github.com/user-attachments/assets/a51755b6-792c-4874-a662-f8c27e36c550" />
+<img width="3024" height="3795" alt="H1 orange" src="https://github.com/user-attachments/assets/fd2c8137-0a80-4ba7-94df-e2d1e133840f" />
